@@ -34,7 +34,11 @@ var banner = `
  ╚══╝╚══╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝
 ========================= ` + appVersion + ` =========================
 `
-var appVersion = `V1.0 230909`
+var appVersion = `V1.0-230909`
+
+var scanDirCount int64 = 0
+var scanFileCount int64 = 0
+var realBackupFileCount int64 = 0
 
 func init() {
 	// -conf, -c
@@ -74,13 +78,16 @@ func init() {
 func main() {
 
 	config := conf.LoadConfig(configFilePath)
-	log.I("-------------------------------------------")
-	log.I("app version: " + appVersion)
-	log.I("run config path : " + configFilePath)
-	log.I("run config mode : " + mode)
-	log.I("backup webdav : " + config.BaseUrl)
-	log.I("backup target dir: " + config.TargetDir)
-	log.I("-------------------------------------------")
+
+	log.I("=================================================")
+	log.I("app version: ", appVersion)
+	log.I("run config path : ", configFilePath)
+	log.I("run config mode : ", mode)
+	log.I("backup webdav : ", config.BaseUrl)
+	log.I("backup target dir: ", config.TargetDir)
+	log.I("log level: ", log.GetLogLevel())
+	log.I("=================================================")
+	log.I()
 
 	webdavClient = gowebdav.NewClient(config.BaseUrl, config.User, config.Password)
 	log.D("start connect webdav")
@@ -92,13 +99,26 @@ func main() {
 		log.D("webdav connect success")
 	}
 
+	timeStartBackup := time.Now()
 	// 开始备份
 	//rootDir, _ := webdavClient.ReadDir("")
 	backupDir("")
+
+	duration := time.Now().Sub(timeStartBackup)
+	log.I()
+	log.I("=================================================")
+	log.I("backup finish, use : " + formatDuration(duration))
+	log.I("scan dir count: ", scanDirCount)
+	log.I("scan file count: ", scanFileCount)
+	log.I("real backup count: ", realBackupFileCount)
+	log.I("=================================================", "\n\n")
+
 }
 
 func backupDir(davBasePath string) {
 	log.D("start backup dir: " + davBasePath)
+	scanDirCount++
+
 	files, _ := webdavClient.ReadDir(filepath.ToSlash(davBasePath))
 
 	if mode == string(ModeMirror) {
@@ -119,11 +139,18 @@ func backupDir(davBasePath string) {
 		localFilePathTemp = filepath.Join(conf.GetTargetBackupRootDir(), davFilePathTemp)
 
 		if !file.IsDir() {
+			scanFileCount++
 			// 文件处理
 			// 看看是否需要跳过文件
 			// 判断是否需要复制
 			if checkNeedToCopy(localFilePathTemp, file) {
+				// 删除本地文件
+				err := os.Remove(localFilePathTemp)
+				if err != nil {
+					log.E("delete local file error:", err)
+				}
 				needBackupFile = append(needBackupFile, file)
+				realBackupFileCount++
 			} else {
 				log.D("skip copy file: " + davFilePathTemp)
 				skipFileCount++
@@ -287,4 +314,14 @@ func checkNeedToCopy(localFilePath string, fileInfo os.FileInfo) bool {
 	}
 
 	return false
+}
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	return fmt.Sprintf("%d hours %d mins %d secs", h, m, s)
 }

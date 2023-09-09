@@ -10,9 +10,9 @@ import (
 type Level int
 
 const (
-	LevelError Level = 3
+	LevelError Level = 1
 	LevelInfo  Level = 2
-	LevelDebug Level = 1
+	LevelDebug Level = 3
 )
 
 const timeFormat = "[MMdd-HHmmss]"
@@ -41,6 +41,16 @@ func SetLogLevel(logLevel Level) {
 	defaultLevel = logLevel
 }
 
+func GetLogLevel() Level {
+	return defaultLevel
+}
+
+func E(msg ...interface{}) {
+	if defaultLevel >= LevelError {
+		printLog(err, msg...)
+	}
+}
+
 func I(msg ...interface{}) {
 	if defaultLevel >= LevelInfo {
 		printLog(info, msg...)
@@ -50,12 +60,6 @@ func I(msg ...interface{}) {
 func D(msg ...interface{}) {
 	if defaultLevel >= LevelDebug {
 		printLog(debug, msg...)
-	}
-}
-
-func E(msg ...interface{}) {
-	if defaultLevel >= LevelError {
-		printLog(err, msg...)
 	}
 }
 
